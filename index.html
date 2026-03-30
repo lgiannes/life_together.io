@@ -1,4 +1,17 @@
 <!doctype html>
+<!--
+  Life Together Fraction Plot (single-page app)
+
+  What this page does:
+  - Accepts exactly 3 non-empty input lines.
+  - Line 1: birth date + name of person 1 (for example: 1990-01-01, Lorenzo)
+  - Line 2: birth date + name of person 2 (for example: 1992-06-15, Francesca)
+  - Line 3: relationship start date only (for example: 2020-03-30)
+  - Computes, month by month from relationship start to today, the fraction
+    of each person's life spent together: together_days / total_lived_days.
+  - Renders both curves on an interactive Plotly chart with real dates (YYYY-MM)
+    on the x-axis.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
