@@ -146,11 +146,11 @@
   <main class="wrap">
     <section class="card">
       <h1>Life Together Fraction Plot</h1>
-      <p>Write your birth date and your name on the first line.<br>Write your partner's birth date and name on the second line.<br>Write the date when your relatioship started on the third line.<br>You'll obtain a plot of the fraction of your lives that you have spent together&#9825.</p>
+      <p> Write your birth date and your name on the first line.<br>Write your partner's birth date and name on the second line.<br>Write the date when your relatioship started on the third line.<br>You'll obtain a plot of the fraction of your lives that you have spent together&#9825. </p>
     </section>
 
     <section class="card grid">
-      <textarea id="rawInput" placeholder="1990-01-01, Lorenzo&#10;1992-06-15, Francesca&#10;2020-03-30"></textarea>
+      <textarea id="rawInput" placeholder="1990-01-01, Person 1&#10;1992-06-15, Person 2&#10;2020-03-30"></textarea>
       <div class="row">
         <input id="fileInput" type="file" accept=".txt,text/plain">
         <button id="plotBtn" type="button">Plot</button>
@@ -317,14 +317,16 @@
             y: p1Fractions,
             mode: "lines",
             name: person1.name,
-            line: { width: 3, color: "#1f7a8c" }
+            line: { width: 3, color: "#1f7a8c" },
+            hovertemplate: "%{x}<br>%{y:.2%}<extra>" + person1.name + "</extra>"
           },
           {
             x: dateAxis,
             y: p2Fractions,
             mode: "lines",
             name: person2.name,
-            line: { width: 3, color: "#f4a261" }
+            line: { width: 3, color: "#f4a261" },
+            hovertemplate: "%{x}<br>%{y:.2%}<extra>" + person2.name + "</extra>"
           }
         ];
 
@@ -340,7 +342,8 @@
             gridcolor: "#ece7d9"
           },
           yaxis: {
-            title: "Fraction of life spent together",
+            title: "Life spent together (%)",
+            tickformat: ".0%",
             showgrid: true,
             gridcolor: "#ece7d9"
           },
