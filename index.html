@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Life Together Fraction</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f4ee;
+      --panel: #fffdf7;
+      --ink: #21201d;
+      --muted: #6d6a63;
+      --accent: #1f7a8c;
+      --accent-2: #f4a261;
+      --danger: #a4161a;
+      --border: #d8d2c2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #e8f3f5 0%, transparent 30%),
+        radial-gradient(circle at 90% 90%, #fef0df 0%, transparent 28%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 28px rgba(33, 32, 29, 0.07);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      letter-spacing: 0.2px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      background: #fff;
+      color: var(--ink);
+      resize: vertical;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input[type="file"] {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fff;
+      max-width: 100%;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--danger);
+      font-weight: 600;
+      min-height: 1.25em;
+    }
+
+    #chart {
+      width: 100%;
+      height: 520px;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .card { padding: 14px; }
+      #chart { height: 440px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Life Together Fraction Plot</h1>
+      <p>Paste 3 lines or upload a text file. Lines 1 and 2 must be: date, name. Line 3 must be date only.</p>
+    </section>
+
+    <section class="card grid">
+      <textarea id="rawInput" placeholder="1990-01-01, Lorenzo&#10;1992-06-15, Francesca&#10;2020-03-30"></textarea>
+      <div class="row">
+        <input id="fileInput" type="file" accept=".txt,text/plain">
+        <button id="plotBtn" type="button">Plot</button>
+      </div>
+      <div class="hint">Accepted separators for line 1 and 2: comma, semicolon, tab, or first whitespace split.</div>
+      <div id="error" class="error" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div id="chart"></div>
+    </section>
+  </main>
+
+  <script>
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    function parseIsoDate(value) {
+      const clean = value.trim();
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clean);
+      if (!match) {
+        throw new Error("Invalid date '" + value + "'. Expected YYYY-MM-DD.");
+      }
+
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      const d = Number(match[3]);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+
+      if (
+        dt.getUTCFullYear() !== y ||
+        dt.getUTCMonth() !== m - 1 ||
+        dt.getUTCDate() !== d
+      ) {
+        throw new Error("Invalid date '" + value + "'.");
+      }
+
+      return dt;
+    }
+
+    function splitColumns(line) {
+      for (const delim of [",", ";", "\t"]) {
+        if (line.includes(delim)) {
+          return line.split(delim, 2).map(s => s.trim());
+        }
+      }
+
+      const parts = line.trim().split(/\s+/, 2);
+      return parts.map(s => s.trim());
+    }
+
+    function daysInMonthUtc(year, month1to12) {
+      return new Date(Date.UTC(year, month1to12, 0)).getUTCDate();
+    }
+
+    function addMonthsUtc(dt, months) {
+      const y = dt.getUTCFullYear();
+      const m0 = dt.getUTCMonth();
+      const d = dt.getUTCDate();
+
+      const total = m0 + months;
+      const newYear = y + Math.floor(total / 12);
+      const newMonth0 = ((total % 12) + 12) % 12;
+      const newMonth1 = newMonth0 + 1;
+      const newDay = Math.min(d, daysInMonthUtc(newYear, newMonth1));
+
+      return new Date(Date.UTC(newYear, newMonth0, newDay));
+    }
+
+    function monthsBetween(start, end) {
+      let months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12;
+      months += end.getUTCMonth() - start.getUTCMonth();
+
+      if (end.getUTCDate() < start.getUTCDate()) {
+        months -= 1;
+      }
+
+      return Math.max(0, months);
+    }
+
+    function computeFraction(birthDate, relationshipStart, currentDate) {
+      const totalLivedDays = Math.floor((currentDate - birthDate) / MS_PER_DAY);
+      const togetherDays = Math.floor((currentDate - relationshipStart) / MS_PER_DAY);
+
+      if (totalLivedDays <= 0) {
+        throw new Error("Current date must be after birth date.");
+      }
+
+      return togetherDays / totalLivedDays;
+    }
+
+    function parseInputText(raw) {
+      const lines = raw
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(Boolean);
+
+      if (lines.length !== 3) {
+        throw new Error("Input must have exactly 3 non-empty lines.");
+      }
+
+      const row1 = splitColumns(lines[0]);
+      const row2 = splitColumns(lines[1]);
+      const row3 = splitColumns(lines[2]);
+
+      if (row1.length < 2 || !row1[1]) {
+        throw new Error("Line 1 must contain birth date and name.");
+      }
+
+      if (row2.length < 2 || !row2[1]) {
+        throw new Error("Line 2 must contain birth date and name.");
+      }
+
+      if (row3.length !== 1) {
+        throw new Error("Line 3 must contain only relationship start date.");
+      }
+
+      const person1 = { name: row1[1], birth: parseIsoDate(row1[0]) };
+      const person2 = { name: row2[1], birth: parseIsoDate(row2[0]) };
+      const relationshipStart = parseIsoDate(row3[0]);
+
+      return { person1, person2, relationshipStart };
+    }
+
+    function plotFromRawInput(raw) {
+      const errorEl = document.getElementById("error");
+      errorEl.textContent = "";
+
+      try {
+        const { person1, person2, relationshipStart } = parseInputText(raw);
+        const today = new Date();
+        const todayUtc = new Date(Date.UTC(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        ));
+
+        if (relationshipStart > todayUtc) {
+          throw new Error("Relationship start date cannot be in the future.");
+        }
+
+        if (relationshipStart <= person1.birth) {
+          throw new Error("Relationship start must be after " + person1.name + " birth date.");
+        }
+
+        if (relationshipStart <= person2.birth) {
+          throw new Error("Relationship start must be after " + person2.name + " birth date.");
+        }
+
+        const totalMonths = monthsBetween(relationshipStart, todayUtc);
+        const dateAxis = [];
+        const p1Fractions = [];
+        const p2Fractions = [];
+
+        for (let m = 0; m <= totalMonths; m += 1) {
+          const currentDate = addMonthsUtc(relationshipStart, m);
+          dateAxis.push(currentDate.toISOString().slice(0, 10));
+          p1Fractions.push(computeFraction(person1.birth, relationshipStart, currentDate));
+          p2Fractions.push(computeFraction(person2.birth, relationshipStart, currentDate));
+        }
+
+        const data = [
+          {
+            x: dateAxis,
+            y: p1Fractions,
+            mode: "lines",
+            name: person1.name,
+            line: { width: 3, color: "#1f7a8c" }
+          },
+          {
+            x: dateAxis,
+            y: p2Fractions,
+            mode: "lines",
+            name: person2.name,
+            line: { width: 3, color: "#f4a261" }
+          }
+        ];
+
+        const layout = {
+          title: "Fraction of Life Spent Together Over Time",
+          paper_bgcolor: "#fffdf7",
+          plot_bgcolor: "#fffdf7",
+          xaxis: {
+            title: "Date (year-month)",
+            type: "date",
+            tickformat: "%Y-%m",
+            showgrid: true,
+            gridcolor: "#ece7d9"
+          },
+          yaxis: {
+            title: "Fraction of life spent together",
+            showgrid: true,
+            gridcolor: "#ece7d9"
+          },
+          legend: {
+            orientation: "h",
+            y: 1.12
+          },
+          margin: { l: 65, r: 20, t: 70, b: 70 }
+        };
+
+        const config = { responsive: true, displaylogo: false };
+        Plotly.newPlot("chart", data, layout, config);
+      } catch (err) {
+        errorEl.textContent = err.message || String(err);
+      }
+    }
+
+    document.getElementById("plotBtn").addEventListener("click", () => {
+      const raw = document.getElementById("rawInput").value;
+      plotFromRawInput(raw);
+    });
+
+    document.getElementById("fileInput").addEventListener("change", async event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const text = await file.text();
+      document.getElementById("rawInput").value = text;
+      plotFromRawInput(text);
+    });
+  </script>
+</body>
+</html>
